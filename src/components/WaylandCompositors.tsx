@@ -2,72 +2,58 @@ import {
     compositorRegistry,
     CompositorRegistryItem,
 } from '../data/compositor-registry'
+import { WaylandInterface } from '../model/wayland'
 import { WaylandProtocolModel } from './common'
+
+const ProtocolBox: React.FC<{
+    version: number | null;
+}> = ({ version }) => {
+    const color = version !== null ? "bg-emerald-700" : "bg-red-900"
+    const label = version !== null ? version : "x"
+
+    return (
+        <td className="border-b border-gray-300 dark:border-gray-900 p-2">
+            <div className="flex justify-center">
+                <div className={`w-7 h-7 leading-7 text-white rounded-lg text-center ${color}`}>
+                    {label}
+                </div>
+            </div>
+        </td>
+    )
+}
+
+const ProtocolRow: React.FC<{
+    interface: {
+        name: string;
+        versions: (number | null)[];
+    }
+}> = ({ interface: interfaces }) => {
+    const name = (
+        <td className="border-b border-gray-300 dark:border-gray-900 p-2">
+            {interfaces.name}
+        </td>
+    )
+
+    return (
+        <tr>
+            {name}
+            {interfaces.versions.map((version, index) => <ProtocolBox key={index} version={version} />)}
+        </tr>
+    )
+}
+
 
 export const WaylandCompositors: React.FC<{
     element: WaylandProtocolModel
 }> = ({ element }) => {
-    const rows = element.interfaces
-        .map((childElement) => {
-            const versions = compositorRegistry.map((comp) => {
+    const filteredInterfaces = element.interfaces
+        .filter((waylandInterface) => {
+            return compositorRegistry.some((comp) => {
                 const info = comp.info.globals.find(
-                    (global) => global.interface === childElement.name
+                    (global) => global.interface === waylandInterface.name
                 )
-
-                if (info !== undefined) {
-                    return info.version
-                } else {
-                    return null
-                }
+                return info !== undefined
             })
-
-            return {
-                name: childElement.name,
-                versions,
-            }
-        })
-        .filter((childElement) => childElement.versions.some((v) => v != null))
-        .map((childElement, index) => {
-            const name = (
-                <td className="border-b border-gray-300 dark:border-gray-900 p-2">
-                    {childElement.name}
-                </td>
-            )
-
-            return (
-                <tr key={index}>
-                    {name}
-                    {childElement.versions.map((version, index) => {
-                        if (version !== null) {
-                            return (
-                                <td
-                                    key={index}
-                                    className="border-b border-gray-300 dark:border-gray-900 p-2"
-                                >
-                                    <div className="flex justify-center">
-                                        <div className="w-7 h-7 leading-7 bg-emerald-700 text-white rounded-lg text-center">
-                                            {version}
-                                        </div>
-                                    </div>
-                                </td>
-                            )
-                        } else {
-                            return (
-                                <td
-                                    key={index}
-                                    className="border-b border-gray-300 dark:border-gray-900 p-2"
-                                >
-                                    <div className="flex justify-center">
-                                        <div className="w-7 h-7 leading-7 bg-red-900 text-white rounded-lg text-center">
-                                            x
-                                        </div>
-                                    </div>
-                                </td>
-                            )
-                        }
-                    })}
-                </tr>
-            )
         })
 
     return (
@@ -83,8 +69,8 @@ export const WaylandCompositors: React.FC<{
             </h4>
 
             <div className="flex items-center overflow-x-auto">
-                {rows.length !== 0 ? (
-                    <CanIUseTable rows={rows} />
+                {filteredInterfaces.length !== 0 ? (
+                    <CanIUseTable interfaces={filteredInterfaces} />
                 ) : (
                     <NotFound />
                 )}
@@ -94,8 +80,8 @@ export const WaylandCompositors: React.FC<{
 }
 
 const CanIUseTable: React.FC<{
-    rows: JSX.Element[]
-}> = ({ rows }) => {
+    interfaces: WaylandInterface[],
+}> = ({ interfaces }) => {
     const SubTitle: React.FC<{ compositor: CompositorRegistryItem }> = ({
         compositor,
     }) => {
@@ -109,7 +95,7 @@ const CanIUseTable: React.FC<{
 
         return (
             <div
-                className="text-xs text-gray-500 mt-1"
+                className="text-xs text-gray-500 mt-1 text-left"
                 title={generationTimestamp}
             >
                 {version}
@@ -118,14 +104,30 @@ const CanIUseTable: React.FC<{
     }
 
     return (
-        <table className="border-colapse bg-gray-50 rounded dark:bg-neutral-900">
+        <table className="border-collapse bg-gray-50 rounded dark:bg-neutral-900">
             <thead>
                 <tr>
                     <th className="p-4"></th>
-                    {compositorRegistry.map((comp) => (
-                        <th key={comp.id} className="px-4 pt-1 align-bottom">
-                            <div className="flex flex-col justify-end items-center gap-2">
-                                <div className="[writing-mode:vertical-rl] rotate-180">
+                    {
+                        interfaces.map((waylandInterface, id) => (
+                            <th key={id} className="u-4 pt-1 align-bottom border-b border-gray-300 dark:border-gray-900 p-2">
+                                <div className="flex flex-col justify-end items-center gap-2">
+                                    <div className="[writing-mode:vertical-rl] rotate-180">
+                                        {waylandInterface.name}
+                                    </div>
+                                </div>
+                            </th>
+                        ))
+                    }
+                </tr>
+            </thead>
+
+            <tbody className="bg-white dark:bg-neutral-800">
+                {compositorRegistry.map((comp) => (
+                    <tr key={comp.id} className="px-4 pt-1 align-bottom">
+                        <th>
+                            <div className="flex flex-row justify-start items-center gap-2">
+                                <div>
                                     {comp.name}
                                 </div>
                                 <div className="aspect-square h-5">
@@ -140,11 +142,18 @@ const CanIUseTable: React.FC<{
                             </div>
                             <SubTitle compositor={comp} />
                         </th>
-                    ))}
-                </tr>
-            </thead>
-
-            <tbody className="bg-white dark:bg-neutral-800">{rows}</tbody>
+                        <ProtocolBox version={1} />
+                        <ProtocolBox version={1} />
+                        <ProtocolBox version={1} />
+                        <ProtocolBox version={1} />
+                        <ProtocolBox version={1} />
+                        <ProtocolBox version={1} />
+                        <ProtocolBox version={1} />
+                        <ProtocolBox version={1} />
+                    </tr>
+                ))}
+                {/* {rows} */}
+            </tbody>
         </table>
     )
 }
